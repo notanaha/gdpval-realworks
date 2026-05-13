@@ -428,7 +428,11 @@ class RepoBootstrapper:
 
     @staticmethod
     def _read_train_parquets(data_dir: Path):
-        """Read all train parquet shards from a snapshot directory."""
+        """Read all train parquet shards from a snapshot directory.
+
+        Returns:
+            Tuple of (sorted shard paths, concatenated DataFrame or None).
+        """
         parquets = sorted(data_dir.glob("train-*.parquet"))
         if not parquets or not PANDAS_AVAILABLE:
             return parquets, None

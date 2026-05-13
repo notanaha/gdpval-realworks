@@ -26,6 +26,9 @@ def _make_rows(start: int, count: int, *, with_files: bool = False) -> list[dict
         start: Starting numeric suffix for generated task IDs.
         count: Number of rows to generate.
         with_files: Whether deliverable_files should contain one file per row.
+
+    Returns:
+        List of row dictionaries containing task metadata and deliverable columns.
     """
     rows = []
     for index in range(start, start + count):
@@ -46,7 +49,11 @@ def _make_rows(start: int, count: int, *, with_files: bool = False) -> list[dict
 
 
 def _write_snapshot(root: Path, shard_sizes: list[int], *, with_files: bool = False) -> list[str]:
-    """Create a sharded snapshot layout and return the generated task IDs."""
+    """Create a sharded snapshot layout.
+
+    Returns:
+        List of generated task IDs in sequential order across all shards.
+    """
     data_dir = root / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
     (root / "reference_files").mkdir(parents=True, exist_ok=True)

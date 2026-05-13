@@ -427,7 +427,7 @@ class RepoBootstrapper:
     # -- Validate ----------------------------------------------------------
 
     @staticmethod
-    def _read_train_parquets(data_dir: Path):
+    def _read_train_parquets(data_dir: Path) -> tuple[list[Path], "pd.DataFrame | None"]:
         """Read all train parquet shards from a snapshot directory.
 
         Returns:
@@ -522,7 +522,11 @@ def validate_pre_upload(
 
     # Find parquet
     data_dir = root / "data"
-    parquets, df = RepoBootstrapper._read_train_parquets(data_dir) if data_dir.exists() else ([], None)
+    parquets, df = (
+        RepoBootstrapper._read_train_parquets(data_dir)
+        if data_dir.exists()
+        else ([], None)
+    )
     if not parquets:
         errors.append("No train-*.parquet found")
         return errors

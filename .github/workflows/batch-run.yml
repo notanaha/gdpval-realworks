@@ -241,8 +241,19 @@ jobs:
           bash step1_prepare_tasks.sh experiments/${{ inputs.experiment_yaml }}.yaml
 
       # ── Step 2a: Run Inference (condition_a) ──
+      - name: 'Check OIDC secrets availability'
+        id: check_oidc
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        run: |
+          if [ -n "$AZURE_CLIENT_ID" ]; then
+            echo "available=true" >> $GITHUB_OUTPUT
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: 'Azure Login (OIDC)'
-        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
+        if: steps.check_oidc.outputs.available == 'true'
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}

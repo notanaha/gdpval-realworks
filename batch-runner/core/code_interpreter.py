@@ -45,34 +45,38 @@ class CodeInterpreterRunner:
         endpoint = endpoint or os.getenv("AZURE_OPENAI_ENDPOINT")
         api_key = api_key or os.getenv("AZURE_OPENAI_API_KEY") or os.getenv("AZURE_API_KEY")
 
-        # Priority 1: DefaultAzureCredential (Entra ID token)
-        try:
-            from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-            credential = DefaultAzureCredential()
-            token_provider = get_bearer_token_provider(
-                credential, "https://cognitiveservices.azure.com/.default"
-            )
-            print("   🔐 CodeInterpreter Auth: DefaultAzureCredential (Entra ID token)")
+        # Priority 1: API Key (if explicitly set, prefer it — most reliable in CI/CD).
+        # DefaultAzureCredential's constructor does NOT fail when no credentials are
+        # available; it only fails later at token-fetch time. So check API key first.
+        if api_key:
+            print("   🔑 CodeInterpreter Auth: API Key (AZURE_OPENAI_API_KEY)")
             self.client = AzureOpenAI(
+                api_key=api_key,
                 azure_endpoint=endpoint,
-                azure_ad_token_provider=token_provider,
                 api_version=api_version,
             )
-        except Exception as e:
-            # Priority 2: API Key fallback
-            if api_key:
-                print(f"   🔑 CodeInterpreter Auth: API Key (DefaultAzureCredential unavailable: {e})")
+        else:
+            # Priority 2: DefaultAzureCredential (Entra ID token) — verify token early
+            try:
+                from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+                credential = DefaultAzureCredential()
+                # Force token fetch now so we fail fast instead of mid-inference.
+                credential.get_token("https://cognitiveservices.azure.com/.default")
+                token_provider = get_bearer_token_provider(
+                    credential, "https://cognitiveservices.azure.com/.default"
+                )
+                print("   🔐 CodeInterpreter Auth: DefaultAzureCredential (Entra ID token)")
                 self.client = AzureOpenAI(
-                    api_key=api_key,
                     azure_endpoint=endpoint,
+                    azure_ad_token_provider=token_provider,
                     api_version=api_version,
                 )
-            else:
+            except Exception as e:
                 raise ValueError(
                     f"No Azure credentials available for CodeInterpreter.\n"
-                    f"  - DefaultAzureCredential failed: {e}\n"
                     f"  - AZURE_OPENAI_API_KEY not set.\n"
-                    f"  Run 'az login' or set AZURE_OPENAI_API_KEY."
+                    f"  - DefaultAzureCredential failed: {e}\n"
+                    f"  Set AZURE_OPENAI_API_KEY or run 'az login'."
                 )
         # Load prompt template
         self.prompt_data = load_prompt(prompt_name or self.DEFAULT_PROMPT)

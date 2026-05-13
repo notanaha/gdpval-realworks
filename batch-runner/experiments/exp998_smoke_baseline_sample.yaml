@@ -32,7 +32,7 @@ condition_a:
   name: "Baseline"
   model:
     provider: "azure" #"anthropic", "azure", "openai", "custom"
-    deployment: "gpt-5-chat"
+    deployment: "gpt-5-mini"
     temperature: 0.0
     seed: 42
   prompt:

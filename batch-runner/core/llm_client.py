@@ -130,10 +130,25 @@ def create_client(
     api_key = api_key or os.getenv("AZURE_OPENAI_API_KEY") or os.getenv("AZURE_API_KEY")
     api_version = api_version or DEFAULT_API_VERSION
 
-    # Priority 1: DefaultAzureCredential (Entra ID token)
+    # Priority 1: API Key (if explicitly set, prefer it — most reliable in CI/CD).
+    # DefaultAzureCredential's constructor does NOT fail when no credentials are
+    # available; it only fails later at token-fetch time, which makes try/except
+    # around the constructor useless for fallback. So check API key first.
+    if api_key:
+        print("   🔑 Auth: API Key (AZURE_OPENAI_API_KEY)")
+        return AzureOpenAI(
+            azure_endpoint=endpoint,
+            api_key=api_key,
+            api_version=api_version,
+            timeout=480,
+        )
+
+    # Priority 2: DefaultAzureCredential (Entra ID token) — verify token early
     try:
         from azure.identity import DefaultAzureCredential, get_bearer_token_provider
         credential = DefaultAzureCredential()
+        # Force token fetch now so we fail fast instead of mid-inference.
+        credential.get_token("https://cognitiveservices.azure.com/.default")
         token_provider = get_bearer_token_provider(
             credential, "https://cognitiveservices.azure.com/.default"
         )
@@ -145,20 +160,11 @@ def create_client(
             timeout=480,
         )
     except Exception as e:
-        # Priority 2: API Key fallback
-        if api_key:
-            print(f"   🔑 Auth: API Key (DefaultAzureCredential unavailable: {e})")
-            return AzureOpenAI(
-                azure_endpoint=endpoint,
-                api_key=api_key,
-                api_version=api_version,
-                timeout=480,
-            )
         raise ValueError(
             f"No Azure credentials available.\n"
-            f"  - DefaultAzureCredential failed: {e}\n"
             f"  - AZURE_OPENAI_API_KEY not set.\n"
-            f"  Run 'az login' or set AZURE_OPENAI_API_KEY."
+            f"  - DefaultAzureCredential failed: {e}\n"
+            f"  Set AZURE_OPENAI_API_KEY or run 'az login'."
         )
 
 

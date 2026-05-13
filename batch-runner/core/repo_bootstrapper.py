@@ -523,7 +523,9 @@ def validate_pre_upload(
         errors.append("No train-*.parquet found")
         return errors
 
-    assert df is not None
+    if df is None:
+        errors.append("Failed to read train-*.parquet files")
+        return errors
 
     # 1. Row count
     if len(df) != expected:

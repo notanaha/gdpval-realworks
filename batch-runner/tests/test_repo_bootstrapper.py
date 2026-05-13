@@ -20,6 +20,13 @@ import core.repo_bootstrapper as repo_bootstrapper
 
 
 def _make_rows(start: int, count: int, *, with_files: bool = False) -> list[dict]:
+    """Build sequential test rows for parquet shards.
+
+    Args:
+        start: Starting numeric suffix for generated task IDs.
+        count: Number of rows to generate.
+        with_files: Whether deliverable_files should contain one file per row.
+    """
     rows = []
     for index in range(start, start + count):
         task_id = f"task_{index:03d}"
@@ -39,6 +46,7 @@ def _make_rows(start: int, count: int, *, with_files: bool = False) -> list[dict
 
 
 def _write_snapshot(root: Path, shard_sizes: list[int], *, with_files: bool = False) -> list[str]:
+    """Create a sharded snapshot layout and return the generated task IDs."""
     data_dir = root / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
     (root / "reference_files").mkdir(parents=True, exist_ok=True)
@@ -60,6 +68,7 @@ def _write_snapshot(root: Path, shard_sizes: list[int], *, with_files: bool = Fa
 
 
 def _write_manifest(workspace_dir: Path, task_ids: list[str], *, needs_files: bool = False) -> None:
+    """Write a minimal step0_needs_files_manifest.json for the given tasks."""
     workspace_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
         "tasks": {

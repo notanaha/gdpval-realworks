@@ -225,7 +225,7 @@ class TestExperimentConfigFromYaml:
             assert config.name == "Test Run - Sample 10"
             assert config.data_filter.sample_size == 10
 
-    def test_from_yaml_smoke_config_uses_sample_size(self):
+    def test_from_yaml_preserves_sample_size_from_smoke_config(self):
         """Smoke-test configs should preserve sample_size for downstream steps."""
         yaml_path = (
             Path(__file__).parent.parent

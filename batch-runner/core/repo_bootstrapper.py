@@ -19,7 +19,10 @@ Lifecycle:
 Usage:
     from core.repo_bootstrapper import RepoBootstrapper
 
-    bs = RepoBootstrapper(submission_repo_id="HyeonSang/exp001_smoke_baseline")
+    bs = RepoBootstrapper(
+        submission_repo_id="HyeonSang/exp001_smoke_baseline",
+        expected_rows=3,
+    )
     bs.bootstrap()
 """
 
@@ -86,6 +89,7 @@ class RepoBootstrapper:
         local_path: Optional[str] = None,
         token: Optional[str] = None,
         private: bool = False,
+        expected_rows: Optional[int] = None,
     ):
         if not HF_HUB_AVAILABLE:
             raise ImportError("huggingface_hub is required.  pip install huggingface_hub")
@@ -94,6 +98,9 @@ class RepoBootstrapper:
         self.local_path = Path(local_path) if local_path else DEFAULT_LOCAL_PATH
         self.token = token or os.getenv("HF_TOKEN")
         self.private = private
+        self.expected_rows = (
+            expected_rows if expected_rows is not None else EXPECTED_TASK_COUNT
+        )
         self.api = HfApi(token=self.token)
         self.manifest_path = WORKSPACE_DIR / "step0_needs_files_manifest.json"
 
@@ -419,6 +426,17 @@ class RepoBootstrapper:
 
     # -- Validate ----------------------------------------------------------
 
+    @staticmethod
+    def _read_train_parquets(data_dir: Path):
+        """Read all train parquet shards from a snapshot directory."""
+        parquets = sorted(data_dir.glob("train-*.parquet"))
+        if not parquets or not PANDAS_AVAILABLE:
+            return parquets, None
+
+        dfs = [pd.read_parquet(path) for path in parquets]
+        df = pd.concat(dfs, ignore_index=True) if len(dfs) > 1 else dfs[0]
+        return parquets, df
+
     def _validate_snapshot(self) -> None:
         """Validate local snapshot integrity."""
         print(f"\n   Validating local snapshot ...")
@@ -429,14 +447,13 @@ class RepoBootstrapper:
         if not data_dir.exists():
             errors.append("data/ directory not found")
         else:
-            parquets = sorted(data_dir.glob("train-*.parquet"))
+            parquets, df = self._read_train_parquets(data_dir)
             if not parquets:
                 errors.append("No train-*.parquet files found in data/")
-            elif PANDAS_AVAILABLE:
-                df = pd.read_parquet(parquets[0])
-                if len(df) != EXPECTED_TASK_COUNT:
+            elif df is not None:
+                if len(df) != self.expected_rows:
                     errors.append(
-                        f"Row count: expected {EXPECTED_TASK_COUNT}, got {len(df)}"
+                        f"Row count: expected {self.expected_rows}, got {len(df)}"
                     )
                 missing = _CRITICAL_COLUMNS - set(df.columns)
                 if missing:
@@ -501,12 +518,12 @@ def validate_pre_upload(
 
     # Find parquet
     data_dir = root / "data"
-    parquets = sorted(data_dir.glob("train-*.parquet")) if data_dir.exists() else []
+    parquets, df = RepoBootstrapper._read_train_parquets(data_dir) if data_dir.exists() else ([], None)
     if not parquets:
         errors.append("No train-*.parquet found")
         return errors
 
-    df = pd.read_parquet(parquets[0])
+    assert df is not None
 
     # 1. Row count
     if len(df) != expected:

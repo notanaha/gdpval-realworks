@@ -23,37 +23,37 @@ if [ ! -f "$YAML_CONFIG" ]; then
   exit 1
 fi
 
-REPO_ID=$(python3 -c "
-import yaml, sys
-with open('$YAML_CONFIG', 'r') as f:
-    cfg = yaml.safe_load(f)
-source = cfg.get('data', {}).get('source', '')
-if not source:
-    print('ERROR: data.source not found in YAML', file=sys.stderr)
-    sys.exit(1)
-print(source)
-")
-
-echo "ℹ️  Submission repo: $REPO_ID  (from $YAML_CONFIG)"
-
 if [ -z "${HF_TOKEN:-}" ]; then
   echo "❌ HF_TOKEN not set."
   echo "   export HF_TOKEN=hf_xxx"
   exit 1
 fi
 
-echo "🔧 Step 0: Bootstrap Submission Repo"
-echo "   Repo: $REPO_ID"
-echo ""
-
-export REPO_ID
+export YAML_CONFIG
 
 python3 - <<'PYEOF'
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) or ".")
+from core.experiment_config import ExperimentConfig
 from core.repo_bootstrapper import RepoBootstrapper
 
-repo_id = os.environ["REPO_ID"]
-bs = RepoBootstrapper(submission_repo_id=repo_id)
+config = ExperimentConfig.from_yaml(os.environ["YAML_CONFIG"])
+repo_id = config.data_filter.source
+if not repo_id:
+    raise ValueError("data.source not found in YAML")
+
+expected_rows = config.data_filter.sample_size
+
+print(f"ℹ️  Submission repo: {repo_id}  (from {os.environ['YAML_CONFIG']})")
+print("🔧 Step 0: Bootstrap Submission Repo")
+print(f"   Repo: {repo_id}")
+if expected_rows is not None:
+    print(f"   Expected rows: {expected_rows}")
+print("")
+
+bs = RepoBootstrapper(
+    submission_repo_id=repo_id,
+    expected_rows=expected_rows,
+)
 bs.bootstrap()
 PYEOF

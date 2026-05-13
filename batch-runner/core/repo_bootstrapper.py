@@ -133,7 +133,12 @@ class RepoBootstrapper:
             print(f"\n   Manifest not found, regenerating from snapshot...")
             self._generate_manifest_from_dir(str(self.local_path))
 
-        # 4. Validate
+        # 4. Self-heal: strip deliverable columns from local snapshot before validation.
+        #    Existing submission repos may have been bootstrapped before stripping logic
+        #    was applied, leaving non-empty deliverable_text rows that fail validation.
+        self._strip_deliverables_in_dir(str(self.local_path))
+
+        # 5. Validate
         self._validate_snapshot()
 
         print(f"\n   Bootstrap complete!")
